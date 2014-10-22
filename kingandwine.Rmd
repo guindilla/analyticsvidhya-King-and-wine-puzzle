@@ -1,0 +1,72 @@
+---
+title: "Commonly asked interview puzzles - King and Wine"
+author: "guindilla"
+date: "Wednesday, October 22, 2014"
+output:
+  html_document: default
+---
+
+## Introduction
+The blog [Analytics Vidhya](http://www.analyticsvidhya.com/) has published in October the [following puzzle](http://www.analyticsvidhya.com/blog/2014/10/commonly-asked-interview-puzzles-part-ii/):
+
+> You are the ruler of an empire and you are about to have a celebration
+> tomorrow.The celebration is the most important party you have ever hosted.
+> You’ve got 1000 bottles of wine you were planning to open for the celebration,
+> but you find out that one of them has been poisoned by your enemy. The poison
+> exhibits no symptoms until death and the death occurs within fifteen hours of
+> consuming even a diluted sample.
+
+I propose hereafter a solution for the puzzle.
+
+## Logic of the solution
+It is known that the venom kills within 15 hours. As such, if I give venom to the same prisoner at different times I can know if the bottle is venomous by checking if he died 15 hours later. As an example to illustrate this:
+
+* if I give venom to a prisoner at time t = 0h = 0min, he will die at time t = 15h = 900min
+* if I give it at time t = 1h = 60 min he will die at time t = 15h = 960min
+* if I give it at time t = 1h30 = 90 min he will die at time t = 15h = 990min
+
+Whatever happens, venom can not be administered later than 15h before the party starts, as otherwise I will only be able to check if it had an effect after the party has started, which is a no-no.
+
+If wine is given to a prisoner from a different bottle each time in given intervals of time, it will be enough to check if the prisoner died 15 hours later to identify which bottle was the cause: if a prisoner dies at 17h20 it is quite likely that the wine with venom was provided to him at 02h20.
+
+The problem is that the venom will not kill in exactly 15 hours, but in a window of time: it will sometimes take 14.5 hours, other times 15.3 hours... Thus, there is some inaccuracy associated with the time it takes to kill which must be taken into account in the  calculations.
+
+The slaves in this scheme would be in charge to administer the wine to prisoners, execute the strategy, keep a close eye on prisoners to check when they die as well as keep the boring housekeeping records on which bottles have been administered and tested.
+
+## Proposed solution
+
+The code used to model the solution above is presented here:
+```{r}
+prisoners.needed <- function(bottles.to.test, hours.remaining, venom.time, accuracy) {
+    min.remaining <- (hours.remaining - venom.time) * 60
+    bottles.per.prisoner <- floor(min.remaining/(accuracy*2))
+    prisoners.needed  <- ceiling(bottles.to.test / bottles.per.prisoner)
+    prisoners.needed
+}
+```
+
+Inputs for the function are explained below:
+
+* *bottles.to.test*: How many bottles must be tested for venom?
+* *hours.remaining* (in hours): how many hours are left before the party starts?
+* *venom.time* (in hours): how much time does the venom take to have an effect?
+* *accuracy* (in minutes): how precise is the estimation of venom effects? this implies that a person ingesting the venom will die with 100% probability within (venom.time\*60-interval, venom.time\*60+interval) minutes of its administration
+
+The code calculates first how many minutes are left before the party starts. It then calculates how many bottles can be administered to prisoners in the time remaining based on the time required to be sure the potential venom has made its effect (which explains the use of *floor()*). Finally, based on this number the number of minimum prisoners required is calculated based on the total number of bottles to check - *ceiling()* is used to ensure full prisoners are calculated. 
+
+## Discussion of the solution
+Below is an estimation of the minimum number of prisoners required for different values of accuracy:
+```{r}
+interval <- 1:10
+prisoners.needed <- sapply(interval, function(i) prisoners.needed(1000, 24, 15, i))
+data.frame(interval=interval, prisoners=prisoners.needed)
+```
+
+Those results make sense: the larger the accuracy time, the more prisoners will be required, as more time will have to pass before being sure the prisoner will not die due of poison.
+
+Another interesting output is that, with intervals of more than 8 minutes (i.e. a venom taking 15h+/-8 min to make an effect) some slaves will have to be designated as volunteers to test bottles of wine if the king wants to make sure all bottles are tested before the party starts.
+
+Of course, this solution could be improved, as some events can affect its outcome:
+
+* prisoners could die for other reasons different than poison: exhaustion, ingestion of too many liquids or too much alcohol, etc. thus bringing uncertainty over the cause of death. A solution would be to test each bottle with two prisoners, although this would likely increase the need for "volunteer" slaves to support the party effort.
+* the solution could be optimized by taking into account that bottles will not be consumed on the party in a short amount of time, and thus bottles could be tested after the party has started, by serving first bottles already tested as safe.
